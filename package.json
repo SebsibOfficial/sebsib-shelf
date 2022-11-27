@@ -1,6 +1,17 @@
 {
   "dependencies": {
-    "express": "^4.18.2"
+    "bcrypt": "^5.1.0",
+    "crypto-js": "^4.1.1",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.7.0",
+    "mongoose": "^6.7.3",
+    "nodemon": "^2.0.20",
+    "xss": "^1.0.14"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "start:dev": "set NODE_ENV=dev&& nodemon index.js"
   },
   "name": "sebsib-shelf",
   "version": "1.0.0",
