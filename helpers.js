@@ -1,4 +1,5 @@
 const CryptoJS = require('crypto-js');
+const XLSX = require('sheetjs-style');
 var TYPES = require('./id-text.json');
 const {User} = require('./models');
 
@@ -134,8 +135,52 @@ const properDisplayString = (answer) => {
   }
 }
 
+const exportToXLSX = (Jdata, fileName) => {
+  const ws = XLSX.utils.aoa_to_sheet(Jdata);
+  var wscols = [
+    {wch: 30},
+    {wch: 20},
+  ];
+
+  ws['!cols'] = wscols;
+  for (const [key, value] of Object.entries(ws)) {
+    // Set Question Row Style
+    if ((key.length == 2 && key.charAt(1) == '2')) {
+      ws[key].s = { // set the style for target cell
+        font: {
+          bold: true
+        },
+      };
+    }
+    // Set Links Style
+    if ((ws[key].v+'').includes(process.env.FILE_SERVER_URL) || (ws[key].v+'').includes("https://maps.google")){
+      if (!(ws[key].v+'').includes(',')){
+        ws[key].l = { Target: ws[key].v, Tooltip: "View" };
+      }
+      ws[key].s = { 
+        font: {
+          underline: true
+        },
+        color: {rgb: "FF0000FF"}
+      };
+    }
+    // Set Number Format
+    if (!isNaN(Number(ws[key].v))) {
+      ws[key].v = Number(ws[key].v)
+      ws[key].t = 'n'
+    }
+    // Set Date Format
+    if ((ws[key].v+'')[4] == '-' && (ws[key].v+'')[7] == '-' && (ws[key].v+'').length == 16) {
+      ws[key].t = 'd'
+    }
+  }
+  const wb = { Sheets: { data: ws }, SheetNames: ["data"] };
+  XLSX.writeFile(wb, `temp/${fileName}.xlsx`);
+}
+
 module.exports = {
   formatData,
   translateIds,
-  filterResponses
+  filterResponses,
+  exportToXLSX
 }

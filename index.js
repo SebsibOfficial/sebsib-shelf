@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
-const { auth, getResponse, getResponseXL, getResponseXLs} = require('./controllers');
+const { auth, getResponse, getResponseXL} = require('./controllers');
 
 // Request Rate Limiting
 const limiter = rateLimit({
@@ -51,5 +51,3 @@ app.use(auth);
 app.get("/shelf/:shortOrg/:survey", auth, getResponse)
 
 app.get("/shelf/xl/:shortOrg/:survey", auth, getResponseXL)
-
-app.get("/shelf/xl/:shortOrg", auth, getResponseXLs)

@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const sanitize = require('./genSantizer');
 const {User, Organization, Survey} = require('./models');
-const {formatData, filterResponses} = require('./helpers');
+const {formatData, filterResponses, exportToXLSX} = require('./helpers');
 
 const auth = async (req, res, next) => {
   var authheader = req.headers.authorization;
@@ -15,6 +15,10 @@ const auth = async (req, res, next) => {
     if (user != null) {
       bcrypt.compare(pass, user.password, async function (err, result) {
         if (result) {
+          // Admin Pass
+          if (user.roleId == '623cc24a8b7ab06011bd1e62' || user.roleId == '623cc24a8b7ab06011bd1e61') {
+            return next();
+          }
           var org = await Organization.findOne({ _id: user.organizationId });
           // Check if the roles are correct
           if (org != null && (user.roleId == '623cc24a8b7ab06011bd1e60' || user.roleId == '6362ad70297414bfb79bdf01')) {
@@ -34,11 +38,82 @@ const auth = async (req, res, next) => {
 }
 
 const getResponseXL = async (req, res, next) => {
-  
-}
+  const surveyId = sanitize(req.params.survey);
+  const shortOrgId = sanitize(req.params.shortOrg);
+  var surveyFound = false;
 
-const getResponseXLs = async (req, res, next) => {
-  
+  try {
+    const accounts = await Organization.aggregate([
+      {
+        "$match": {
+          "orgId": shortOrgId
+        },
+      },
+      {
+        "$lookup": {
+          "from": "projects",
+          "localField": "projectsId",
+          "foreignField": "_id",
+          "as": "projects",
+          "pipeline": [
+            {
+              "$lookup": {
+                "from": "surveys",
+                "localField": "surveysId",
+                "foreignField": "_id",
+                "as": "surveys",
+              },
+            }
+          ],
+        }
+      }
+    ]);
+    var account = accounts[0];
+    for (let index = 0; index < account.projects.length; index++) {
+      const project = account.projects[index];
+      if (project.surveys.some(survey => survey.shortSurveyId == surveyId)) // The survey belongs to the org
+        surveyFound = true;
+    }
+  }
+  catch (err) {
+    console.log(err);
+  }
+
+  // If survey is found 
+  if (surveyFound) {
+    const survey = await Survey.aggregate([
+      {
+        "$match": {
+          "shortSurveyId": surveyId
+        }
+      },
+      {
+        "$lookup": {
+          "from": "questions",
+          "localField": "questions",
+          "foreignField": "_id",
+          "as": "joined_questions"
+        }
+      },
+      {
+        "$lookup": {
+          "from": "responses",
+          "localField": "responses",
+          "foreignField": "_id",
+          "as": "joined_responses"
+        }
+      }
+    ]);
+    var questions = survey[0].joined_questions.sort(function(x, y){return x.createdOn - y.createdOn;});
+    var responses = survey[0].joined_responses;
+    var filtered = await filterResponses(responses)
+
+    exportToXLSX(formatData(questions, filtered), surveyId)
+    return res.status(200).sendFile('./temp/'+surveyId+'.xlsx', { root: __dirname });
+  }
+
+  return res.status(403).json({message: "Bad Input"})
+
 }
 
 const getResponse = async (req, res, next) => {
@@ -163,6 +238,5 @@ const getResponse = async (req, res, next) => {
 module.exports = {
   auth,
   getResponse,
-  getResponseXL,
-  getResponseXLs
+  getResponseXL
 }
