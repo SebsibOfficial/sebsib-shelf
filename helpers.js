@@ -70,6 +70,7 @@ const formatData = (questions, responses) => {
   var queses = [];
   rows.push(["Requested on : "+new Date().toLocaleDateString()]);
   queses.push("Enumrator Name");
+  queses.push("Sent From");
   queses.push("Sent Date and Time");
   questions.forEach((question) => {
     queses.push(question.questionText)
@@ -78,6 +79,7 @@ const formatData = (questions, responses) => {
   responses.forEach((response) => {
     let anses = [];
     anses.push(response.enumratorName);
+    anses.push(response.geoPoint);
     anses.push(response.sentDate);
     response.answers.forEach((answer) => {
       anses.push(properDisplayString(answer));
