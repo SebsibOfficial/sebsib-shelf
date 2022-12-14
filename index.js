@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
 const { auth, getResponse, getResponseXL} = require('./controllers');
+const path = require('path');
 
 // Request Rate Limiting
 const limiter = rateLimit({
@@ -41,7 +42,7 @@ else {
 
 // Clear the /temp folder
 setInterval(() => {
-  fs.readdirSync(__dirname+'/temp').forEach(f => fs.rmSync(`${__dirname+'/temp'}/${f}`));
+  fs.readdirSync(path.join(__dirname, 'temp')).forEach(f => fs.rmSync(path.join(__dirname, 'temp', `${f}`)));
 }, 600000*12)
 
 app.use(bodyParser.json()); // Parsing JSON body
