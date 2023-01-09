@@ -51,18 +51,44 @@ const filterResponses = async (responses, from, to, at) => {
       modifiedResp[index].enumratorName = res.firstName+' '+res.lastName;
     }      
   }
-  console.log(new Date(at));
   if (from !== undefined && to !== undefined) {
-    return modifiedResp.filter((resp) => (new Date(resp.sentDate).getTime() > new Date(from).getTime()) &&  (new Date(resp.sentDate).getTime() < new Date(to).getTime()));
+    return modifiedResp.filter((resp) => (new Date(resp.sentDate).getTime() >= new Date(from).getTime()) &&  (new Date(resp.sentDate).getTime() <= new Date(to).getTime()));
   }
   else if (from !== undefined) {
-    return modifiedResp.filter((resp) => (new Date(resp.sentDate).getTime() > new Date(from).getTime()));
+    return modifiedResp.filter((resp) => (new Date(resp.sentDate).getTime() >= new Date(from).getTime()));
   }
   else if (at !== undefined) {
     return modifiedResp.filter((resp) => (new Date(resp.sentDate).setHours(0,0,0,0).valueOf() === new Date(at).setHours(0,0,0,0)).valueOf());
   }
   else
     return modifiedResp.sort(function(a,b) { return new Date(b.sentDate).getTime() - new Date(a.sentDate).getTime() } );
+}
+
+function getAnswer (id, questions) {
+  var output = [];
+  if (typeof id === 'object') {
+    var ids = [];
+    ids = id;
+    questions.forEach((question) => {
+      question.options.forEach((option) => {
+        ids.forEach(ID => {
+          if (option._id == ID) output.push(option.text) 
+        })
+      })
+    })
+    return output.join(", ")
+  }
+  else if (typeof id === 'string') {
+    questions.forEach((question) => {
+      question.options.forEach((option) => {      
+        if (option._id == id){
+          output.push(option.text)
+        }
+      })
+    })
+    return output.join()
+  }
+  return 'Not found';
 }
 
 const formatData = (questions, responses) => {
@@ -82,16 +108,16 @@ const formatData = (questions, responses) => {
     anses.push(response.geoPoint);
     anses.push(response.sentDate);
     response.answers.forEach((answer) => {
-      anses.push(properDisplayString(answer));
+      anses.push(properDisplayString(answer, questions));
     })
     rows.push(anses);
   })
   return rows;
 }
 
-const properDisplayString = (answer) => {
+const properDisplayString = (answer, Qs) => {
   if (translateIds('ID', answer.inputType) == 'CHOICE' || translateIds('ID', answer.inputType) == 'MULTI-SELECT') {
-    return getAnswer(answer.answer)
+    return getAnswer(answer.answer, Qs)
   }
   else if (translateIds('ID', answer.inputType) == 'MULTI-PHOTO' || translateIds('ID', answer.inputType) == 'MULTI-FILE') {
     if (typeof answer.answer === 'object') {
