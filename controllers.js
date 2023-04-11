@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const sanitize = require('./genSantizer');
 const {User, Organization, Survey} = require('./models');
-const {formatData, filterResponses, exportToXLSX} = require('./helpers');
+const {formatData, filterResponses, PrepareForDisp} = require('./helpers');
 
 const auth = async (req, res, next) => {
   var authheader = req.headers.authorization;
@@ -123,7 +123,7 @@ const getResponse = async (req, res, next) => {
   const surveyId = sanitize(req.params.survey);
   const shortOrgId = sanitize(req.params.shortOrg);
   var surveyFound = false;
-
+  const survey_type_check = await Survey.findOne({shortSurveyId: surveyId});
   try {
     const accounts = await Organization.aggregate([
       {
@@ -171,7 +171,7 @@ const getResponse = async (req, res, next) => {
       },
       {
         "$lookup": {
-          "from": "questions",
+          "from": survey_type_check.type == "REGULAR" ? "questions" : "online-questions",
           "localField": "questions",
           "foreignField": "_id",
           "as": "joined_questions"
@@ -193,8 +193,8 @@ const getResponse = async (req, res, next) => {
   // /shelf/:shortOrg/:survey
   if (at == undefined && from == undefined && to == undefined && surveyFound) {
     try {
-      var filtered = await filterResponses(responses)
-      return res.status(200).json(formatData(questions, filtered));
+      var ForDisp = PrepareForDisp(survey_type_check, questions, responses);
+      return res.json(ForDisp)
     } catch (error) {
       console.log(error);
       return res.status(500).json({ message: "Bad Input" });

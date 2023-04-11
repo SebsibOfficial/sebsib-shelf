@@ -36,179 +36,164 @@ const GetMember = async (id) => {
   }
 }
 
-const filterResponses = async (responses, from, to, at) => {
-  var enumr = [];
-  var resp = [];
-  var modifiedResp = responses;
-  for (let index = 0; index < responses.length; index++) {
-    if (resp.includes(responses[index]._id)) {
-      modifiedResp[index].enumratorName = enumr[resp.findIndex((rsp) => rsp == responses[index]._id)];
-    }
-    else {
-      var res = await GetMember(responses[index].enumratorId);
-      resp.push(responses[index]._id);
-      enumr.push(res.firstName+' '+res.lastName);
-      modifiedResp[index].enumratorName = res.firstName+' '+res.lastName;
-    }      
-  }
-  if (from !== undefined && to !== undefined) {
-    return modifiedResp.filter((resp) => (new Date(resp.sentDate).getTime() >= new Date(from).getTime()) &&  (new Date(resp.sentDate).getTime() <= new Date(to).getTime()));
-  }
-  else if (from !== undefined) {
-    return modifiedResp.filter((resp) => (new Date(resp.sentDate).getTime() >= new Date(from).getTime()));
-  }
-  else if (at !== undefined) {
-    return modifiedResp.filter((resp) => (new Date(resp.sentDate).setHours(0,0,0,0).valueOf() === new Date(at).setHours(0,0,0,0)).valueOf());
-  }
-  else
-    return modifiedResp.sort(function(a,b) { return new Date(b.sentDate).getTime() - new Date(a.sentDate).getTime() } );
-}
-
-function getAnswer (id, questions) {
-  var output = [];
-  if (typeof id === 'object') {
-    var ids = [];
-    ids = id;
-    questions.forEach((question) => {
-      question.options.forEach((option) => {
-        ids.forEach(ID => {
-          if (option._id == ID) output.push(option.text) 
+const PrepareForDisp = (survey, questions, responses) => {
+  switch (survey.type) {
+    case "ONLINE":
+      // Clean Questions
+      var temp_questions = []
+      questions.forEach(question => {
+        var temp_choices = []
+        question.options.forEach(op => {
+          temp_choices.push({
+            _id: (op._id+"").substring(12,24),
+            choice: op.text
+          })
         })
-      })
-    })
-    return output.join(", ")
-  }
-  else if (typeof id === 'string') {
-    questions.forEach((question) => {
-      question.options.forEach((option) => {      
-        if (option._id == id){
-          output.push(option.text)
-        }
-      })
-    })
-    return output.join()
-  }
-  return 'Not found';
-}
-
-const formatData = (questions, responses) => {
-  var rows = [];
-  var queses = [];
-  rows.push(["Requested on : "+new Date().toLocaleDateString()]);
-  queses.push("Enumrator Name");
-  queses.push("Sent From");
-  queses.push("Sent Date and Time");
-  questions.forEach((question) => {
-    queses.push(question.questionText)
-  });
-  rows.push(queses);
-  responses.forEach((response) => {
-    let anses = [];
-    anses.push(response.enumratorName);
-    anses.push(response.geoPoint);
-    anses.push(response.sentDate);
-    response.answers.forEach((answer) => {
-      anses.push(properDisplayString(answer, questions));
-    })
-    rows.push(anses);
-  })
-  return rows;
-}
-
-const properDisplayString = (answer, Qs) => {
-  if (translateIds('ID', answer.inputType) == 'CHOICE' || translateIds('ID', answer.inputType) == 'MULTI-SELECT') {
-    return getAnswer(answer.answer, Qs)
-  }
-  else if (translateIds('ID', answer.inputType) == 'MULTI-PHOTO' || translateIds('ID', answer.inputType) == 'MULTI-FILE') {
-    if (typeof answer.answer === 'object') {
-      var paths = answer.answer;
-      var out_p = "";
-      paths.map((path) => {
-        out_p = out_p.concat(`${process.env.FILE_SERVER_URL+encryptPath(path)} ,`)
-      })
-      return out_p
-    }
-    else if (typeof answer.answer === 'string') {
-      return `${process.env.FILE_SERVER_URL+encryptPath(answer.answer)}`
-    }
-  }
-  else if (translateIds('ID', answer.inputType) == 'PHOTO' || translateIds('ID', answer.inputType) == 'FILE') {
-    return `${process.env.FILE_SERVER_URL+encryptPath(answer.answer)}`
-  }
-  else if (translateIds('ID', answer.inputType) == 'GEO-POINT' || translateIds('ID', answer.inputType) == 'MULTI-GEO-POINT') {
-    if (typeof answer.answer === 'object') {
-      var locs = answer.answer;
-      var out_g = ""
-      locs.map((loc) => {
-        out_g = out_g.concat(`https://maps.google.com/?q=${(loc).split(',')[0]},${(loc).split(',')[1]} ,`)
-      })
-      return out_g
-    }
-    else if (typeof answer.answer === 'string') {
-      return `https://maps.google.com/?q=${(answer.answer).split(',')[0]},${(answer.answer).split(',')[1]}`
-    }
-  }
-  else {
-    if (typeof answer.answer === 'object') {
-      var anses = answer.answer;
-      var out_pl = "";
-      anses.map((plain_answer) => (
-        out_pl = out_pl.concat(plain_answer+' ,')
-      ))
-      return out_pl
-    }
-    else if (typeof answer.answer === 'string') {
-      return answer.answer
-    }
-  }
-}
-
-const exportToXLSX = (Jdata, fileName) => {
-  const ws = XLSX.utils.aoa_to_sheet(Jdata);
-  var wscols = [
-    {wch: 30},
-    {wch: 20},
-  ];
-
-  ws['!cols'] = wscols;
-  for (const [key, value] of Object.entries(ws)) {
-    // Set Question Row Style
-    if ((key.length == 2 && key.charAt(1) == '2')) {
-      ws[key].s = { // set the style for target cell
-        font: {
-          bold: true
+        temp_questions.push({
+          _id: (question._id+"").substring(12,24),
+          question: question.questionText,
+          question_type: translateIds("ID", question.inputType),
+          options: temp_choices,
+          number: question.number
+        })
+      });
+      // Clean Responses
+      var temp_responses = []
+      responses.forEach(response => {
+        var temp_answers = []
+        response.answers.forEach(answer => {
+          temp_answers.push({
+            _id: (answer._id+"").substring(12,24),
+            answer_type: translateIds("ID", answer.inputType),
+            question_id: (answer.questionId+"").substring(12,24),
+            answer: properDisplay(answer, questions, "ONLINE")
+          })
+        })
+        temp_responses.push({
+          _id: (response._id+"").substring(12,24),
+          answers: temp_answers,
+          sent_date: response.sentDate
+        })
+      });
+      return {
+        SURVEYINFO: {
+          NAME: survey.name,
+          SHORTID: survey.shortSurveyId,
+          TYPE: survey.type,
+          STATUS: survey.status,
+          DESCRIPTION: survey.description,
+          CREATEDON: survey.createdOn,
+          RESPONSE_COUNT: survey.responses.length
         },
-      };
-    }
-    // Set Links Style
-    if ((ws[key].v+'').includes(process.env.FILE_SERVER_URL) || (ws[key].v+'').includes("https://maps.google")){
-      if (!(ws[key].v+'').includes(',')){
-        ws[key].l = { Target: ws[key].v, Tooltip: "View" };
+        QUESTIONS: temp_questions,
+        RESPONSES: temp_responses
       }
-      ws[key].s = { 
-        font: {
-          underline: true
+    /*---------------------------------------------------*/
+    case "REGULAR":
+      // Clean Questions
+      var temp_questions = []
+      questions.forEach(question => {
+        var temp_choices = []
+        question.options.forEach(op => {
+          temp_choices.push({
+            _id: (op._id+"").substring(12,24),
+            choice: op.text[0].text
+          })
+        })
+        temp_questions.push({
+          _id: (question._id+"").substring(12,24),
+          question: question.questionText[0].text,
+          question_type: translateIds("ID", question.inputType),
+          options: temp_choices,
+          number: question.number
+        })
+      });
+      // Clean Responses
+      var temp_responses = []
+      responses.forEach(response => {
+        var temp_answers = []
+        response.answers.forEach(answer => {
+          temp_answers.push({
+            _id: (answer._id+"").substring(12,24),
+            answer_type: translateIds("ID", answer.inputType),
+            question_id: (answer.questionId+"").substring(12,24),
+            answer: properDisplay(answer, questions, "REGULAR")
+          })
+        })
+        temp_responses.push({
+          _id: (response._id+"").substring(12,24),
+          answers: temp_answers,
+          sent_date: response.sentDate
+        })
+      });
+      return {
+        SURVEYINFO: {
+          NAME: survey.name,
+          SHORTID: survey.shortSurveyId,
+          TYPE: survey.type,
+          STATUS: survey.status,
+          DESCRIPTION: survey.description,
+          CREATEDON: survey.createdOn,
+          RESPONSE_COUNT: survey.responses.length
         },
-        color: {rgb: "FF0000FF"}
-      };
-    }
-    // Set Number Format
-    if (!isNaN(Number(ws[key].v))) {
-      ws[key].v = Number(ws[key].v)
-      ws[key].t = 'n'
-    }
-    // Set Date Format
-    if ((ws[key].v+'')[4] == '-' && (ws[key].v+'')[7] == '-' && (ws[key].v+'').length == 16) {
-      ws[key].t = 'd'
-    }
+        QUESTIONS: temp_questions,
+        RESPONSES: temp_responses
+      }
+    default:
+      break;
   }
-  const wb = { Sheets: { data: ws }, SheetNames: ["data"] };
-  XLSX.writeFile(wb, `temp/${fileName}.xlsx`);
+}
+
+const properDisplay = (answer, questions, surveyType) => {
+  switch (translateIds("ID", answer.inputType)) {
+    case "GEO-POINT":
+      
+      break;
+    case "MULTI-GEO-POINT":
+      
+      break;
+    case "CHOICE":
+      if (surveyType == "ONLINE"){
+        var theQuestion = questions.filter((q) => String(q._id) == String(answer.questionId))[0];
+        return theQuestion.options.filter(o => o._id == answer.answer)[0].text;
+      }
+      else if (surveyType == "REGULAR"){
+        var theQuestion = questions.filter((q) => String(q._id) == String(answer.questionId))[0];
+        return theQuestion.options.filter(o => o._id == answer.answer)[0].text[0].text;
+      }
+    case "MULTI-SELECT":
+      if (surveyType == "ONLINE"){
+        var theQuestion = questions.filter((q) => String(q._id) == String(answer.questionId))[0];
+        var theOptions = theQuestion.options.filter(o => answer.answer.includes(o._id));
+        var DisplayFinalAns = ""
+        theOptions.forEach(theO => DisplayFinalAns+theO.text+", ")
+        return DisplayFinalAns
+      }
+      else if (surveyType == "REGULAR"){
+        var theQuestion = questions.filter((q) => String(q._id) == String(answer.questionId))[0];
+        var theOptions = theQuestion.options.filter(o => answer.answer.includes(o._id));
+        var DisplayFinalAns = ""
+        theOptions.forEach(theO => DisplayFinalAns+theO.text[0].text+", ")
+        return DisplayFinalAns
+      }
+    default:
+      if (["FILE", "PHOTO"].includes(translateIds("ID", answer.inputType))) {
+
+      }
+      else if (["MULTI-FILE", "MULTI-PHOTO"].includes(translateIds("ID", answer.inputType))) {
+
+      }
+      else if (["TEXT", "NUMBER", "TIME", "DATE"].includes(translateIds("ID", answer.inputType))) {
+        return answer.answer
+      }
+      else if (["MULTI-TEXT", "MULTI-NUMBER", "MULTI-TIME", "MULTI-DATE"].includes(translateIds("ID", answer.inputType))) {
+
+      }
+      break;
+  }
 }
 
 module.exports = {
-  formatData,
   translateIds,
-  filterResponses,
-  exportToXLSX
+  PrepareForDisp
 }
