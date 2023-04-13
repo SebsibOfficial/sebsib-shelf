@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const sanitize = require('./genSantizer');
 const {User, Organization, Survey} = require('./models');
-const {formatData, filterResponses, PrepareForDisp} = require('./helpers');
+const {exportToXLSX, filterResponsesByTime, formatDataForExcel, PrepareForDisp} = require('./helpers');
 
 const auth = async (req, res, next) => {
   var authheader = req.headers.authorization;
@@ -41,7 +41,7 @@ const getResponseXL = async (req, res, next) => {
   const surveyId = sanitize(req.params.survey);
   const shortOrgId = sanitize(req.params.shortOrg);
   var surveyFound = false;
-
+  const survey_type_check = await Survey.findOne({shortSurveyId: surveyId});
   try {
     const accounts = await Organization.aggregate([
       {
@@ -89,7 +89,7 @@ const getResponseXL = async (req, res, next) => {
       },
       {
         "$lookup": {
-          "from": "questions",
+          "from": survey_type_check.type == "REGULAR" ? "questions" : "online-questions",
           "localField": "questions",
           "foreignField": "_id",
           "as": "joined_questions"
@@ -106,9 +106,7 @@ const getResponseXL = async (req, res, next) => {
     ]);
     var questions = survey[0].joined_questions.sort(function(x, y){return x.createdOn - y.createdOn;});
     var responses = survey[0].joined_responses;
-    var filtered = await filterResponses(responses)
-
-    exportToXLSX(formatData(questions, filtered), surveyId)
+    exportToXLSX(formatDataForExcel(questions, responses, survey_type_check.type, survey_type_check.name), surveyId)
     return res.status(200).sendFile('./temp/'+surveyId+'.xlsx', { root: __dirname });
   }
 
@@ -203,8 +201,8 @@ const getResponse = async (req, res, next) => {
   // /shelf/:shortOrg/:survey?at=MM-DD-YYYY
   else if (at != undefined && from == undefined && to == undefined && surveyFound) {
     try {
-      var filtered = await filterResponses(responses, from, to, at)
-      return res.status(200).json(formatData(questions, filtered));
+      var ForDisp = PrepareForDisp(survey_type_check, questions, filterResponsesByTime(responses, "AT", at));
+      return res.json(ForDisp)
     } catch (error) {
       console.log(error);
       return res.status(500).json({ message: "Bad Input" });
@@ -213,8 +211,8 @@ const getResponse = async (req, res, next) => {
   // /shelf/:shortOrg/:survey?from=MM-DD-YYYY
   else if (at == undefined && from != undefined && to == undefined && surveyFound) {
     try {
-      var filtered = await filterResponses(responses, from)
-      return res.status(200).json(formatData(questions, filtered));
+      var ForDisp = PrepareForDisp(survey_type_check, questions, filterResponsesByTime(responses, "FROM", from));
+      return res.json(ForDisp)
     } catch (error) {
       console.log(error);
       return res.status(500).json({ message: "Bad Input" });
@@ -223,8 +221,8 @@ const getResponse = async (req, res, next) => {
   // /shelf/:shortOrg/:survey?from=MM-DD-YYYY&to=MM-DD-YYYY
   else if (from != undefined && to != undefined && at == undefined && surveyFound) {
     try {
-      var filtered = await filterResponses(responses, from, to)
-      return res.status(200).json(formatData(questions, filtered));
+      var ForDisp = PrepareForDisp(survey_type_check, questions, filterResponsesByTime(responses, "FROM_TO", from, to));
+      return res.json(ForDisp)
     } catch (error) {
       console.log(error);
       return res.status(500).json({ message: "Bad Input" });
