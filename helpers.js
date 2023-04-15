@@ -176,7 +176,7 @@ const properDisplay = (answer, questions, surveyType) => {
         return fileDisp
       }
       else if (["DATE"].includes(translateIds("ID", answer.inputType))) {
-        return answer.answer.toISOString().split('T')[0]
+        return new Date(answer.answer).toISOString().split('T')[0]
       }
       else if (["TEXT", "NUMBER", "TIME", "DATE"].includes(translateIds("ID", answer.inputType))) {
         return answer.answer
